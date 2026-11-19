@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>邊下棋邊聊天</title>
+  <style>
+    :root {
+      font-family: system-ui, "Microsoft JhengHei", sans-serif;
+      color: #f4f0e6;
+      background: #1b201e;
+      --muted: #b4beb6;
+      --edge: #39453e;
+      --accent: #cbe2a8;
+      --light: #e7dfca;
+      --dark: #68816e;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: radial-gradient(ellipse at top, #2c3a30, #1b201e 75%); min-height: 100vh; }
+    main { width: min(100%, 650px); margin: 0 auto; padding: clamp(12px, 3vw, 30px); }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin-bottom: 16px; }
+    h1 { margin: 0; line-height: 1.2; font-size: clamp(20px, 4.5vw, 29px); letter-spacing: .025em; }
+    button { font: inherit; }
+    .status { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-size: 13px; }
+    .status::before { content: ''; border: 1px solid currentColor; border-radius: 50%; width: 7px; height: 7px; background: currentColor; }
+    .status.waiting { color: var(--muted); }
+    .status.waiting::before { background: transparent; }
+    .player { display: flex; align-items: center; gap: 9px; min-height: 37px; font-size: 14px; color: var(--muted); }
+    .player.active { color: #faf7eb; }
+    .chip { width: 16px; height: 16px; border: 1px solid #9daaa0; border-radius: 50%; background: #1b2421; }
+    .chip.white { background: #fffae8; }
+    .player small { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .player.active small { color: var(--accent); }
+    .board-wrap { position: relative; }
+    #board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); border-radius: 9px; overflow: hidden; outline: 1px solid #859687; box-shadow: 0 10px 32px #11181470; container-type: inline-size; }
+    .square { border: 0; padding: 0; margin: 0; background: var(--light); color: #34483a; aspect-ratio: 1; display: grid; place-items: center; position: relative; cursor: default; }
+    .square.dark { background: var(--dark); color: #fff7df; }
+    .square.turn-piece, .square.target { cursor: pointer; }
+    .square.last { background: #c5ce85; color: #283a2b; }
+    .square.dark.last { background: #a3b56e; }
+    .square.selected { background: #e2d899; color: #283a2b; box-shadow: inset 0 0 0 3px #496136; }
+    .square.checked { background: #d38b78; color: #412a24; }
+    .square:focus-visible { outline: 3px solid #25362b; outline-offset: -4px; z-index: 2; }
+    .piece { font: 8.8cqw/.9 "Segoe UI Symbol", "DejaVu Sans", sans-serif; color: #25312c; text-shadow: 0 1px 1px #f8f1d970; user-select: none; }
+    .piece.white { color: #fff9e8; -webkit-text-stroke: 1px #3d453c; paint-order: stroke fill; text-shadow: 0 1px 2px #29362b80; }
+    .coord { position: absolute; font-size: clamp(10px, 2.5cqw, 13px); line-height: 1; font-weight: 700; pointer-events: none; }
+    .rank { top: 3px; left: 4px; }
+    .file { bottom: 3px; right: 4px; }
+    .target::after { content: ''; width: 24%; aspect-ratio: 1; position: absolute; border-radius: 50%; background: #22382c65; pointer-events: none; }
+    .target.capture::after { width: 89%; background: none; border: 3px solid #263e30a0; }
+    .promotion { position: absolute; z-index: 3; top: 50%; left: 50%; transform: translate(-50%, -50%); width: max-content; max-width: 94%; border: 1px solid #59685a; border-radius: 12px; background: #243029; box-shadow: 0 0 0 100vmax #141c1880; padding: 14px; text-align: center; }
+    .promotion strong { display: block; margin-bottom: 8px; }
+    .promotion-options { display: flex; justify-content: center; gap: 4px; }
+    .promotion-options button { padding: 6px 8px; font: 27px/1 "Segoe UI Symbol", sans-serif; }
+    .board-wrap:has(.promotion:not([hidden])) { overflow: hidden; border-radius: 9px; }
+    .controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
+    #hint { color: var(--muted); font-size: 13px; margin: 0; }
+    #error { color: #ffbda8; font-size: 13px; margin: 8px 0 0; }
+    .action { border: 1px solid #5b6b5c; border-radius: 6px; color: inherit; background: #2b372e; cursor: pointer; padding: 5px 9px; font-size: 13px; }
+    .action:hover { background: #3b4b3e; }
+    section.score { border-top: 1px solid var(--edge); margin-top: 16px; padding-top: 9px; }
+    h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+    #score { margin: 0; padding: 0; list-style: none; max-height: 130px; overflow: auto; font-size: 13px; }
+    #score li { display: grid; grid-template-columns: 34px 1fr 1fr; gap: 8px; padding: 4px 5px; font-variant-numeric: tabular-nums; }
+    #score li:nth-child(odd) { background: #ffffff07; }
+    #score li > :first-child { color: var(--muted); }
+    #score li:last-child > :last-child:not(:empty) { color: var(--accent); }
+    @media (max-width: 330px) { .coord { font-size: 9px; } .rank { left: 2px; } .file { right: 2px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>邊下棋邊聊天</h1>
+      <span class="status waiting" id="status" role="status">連線中</span>
+    </header>
+    <div class="player" id="black"><span class="chip" aria-hidden="true"></span>Codex <small>黑棋</small></div>
+    <div class="board-wrap">
+      <div id="board" role="group" aria-label="西洋棋棋盤"></div>
+      <div class="promotion" id="promotion" role="group" aria-label="兵升變" hidden>
+        <strong>選擇升變棋子</strong>
+        <div class="promotion-options" id="promotion-options"></div>
+        <button type="button" class="action" id="cancel" style="margin-top: 8px">取消</button>
+      </div>
+    </div>
+    <div class="player" id="white"><span class="chip white" aria-hidden="true"></span>你 <small>白棋</small></div>
+    <div class="controls">
+      <p id="hint">點棋子，再點要走的格子。</p>
+      <button type="button" class="action" id="undo" hidden>反悔這步</button>
+      <button type="button" class="action" id="rematch" hidden>開始新局</button>
+    </div>
+    <p id="error" role="alert" hidden></p>
+    <section class="score" id="score-section" hidden>
+      <h2>棋譜</h2>
+      <ol id="score" aria-label="棋譜，依序顯示白棋和黑棋走法"></ol>
+    </section>
+  </main>
+  <script>
+    const pieces = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' };
+    const names = { p: '兵', n: '馬', b: '象', r: '車', q: '后', k: '王' };
+    const byId = id => document.getElementById(id);
+    const board = byId('board');
+    const status = byId('status');
+    const hint = byId('hint');
+    const fileNames = 'abcdefgh';
+    const squares = [];
+    let state = null;
+    let selected = null;
+    let promotionMoves = [];
+    let busy = false;
+    let online = false;
+    let lastRequest = 0;
+
+    for (let index = 0; index < 64; index++) {
+      const file = index % 8;
+      const rank = 8 - Math.floor(index / 8);
+      const square = fileNames[file] + rank;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `square${(file + rank) % 2 ? ' dark' : ''}`;
+      button.setAttribute('aria-label', square);
+      button.addEventListener('click', () => selectSquare(square));
+      const piece = document.createElement('span');
+      piece.className = 'piece';
+      piece.setAttribute('aria-hidden', 'true');
+      button.append(piece);
+      for (const [show, kind, label] of [[file === 0, 'rank', rank], [rank === 1, 'file', fileNames[file]]]) {
+        if (!show) continue;
+        const coord = document.createElement('span');
+        coord.className = `coord ${kind}`;
+        coord.textContent = label;
+        coord.setAttribute('aria-hidden', 'true');
+        button.append(coord);
+      }
+      squares.push({ square, button, piece });
+      board.append(button);
+    }
+
+    function setError(message = '') {
+      const error = byId('error');
+      error.textContent = message;
+      error.hidden = !message;
+    }
+
+    function draw() {
+      if (!state) return;
+      const whiteTurn = state.turn === 'w' && !state.result;
+      const last = state.moves.at(-1);
+      const targets = new Set(state.legal.filter(move => move.from === selected).map(move => move.to));
+      squares.forEach(({ square, button, piece }, index) => {
+        const occupied = state.board[index];
+        const name = occupied ? `${occupied.color === 'w' ? '白' : '黑'}${names[occupied.type]}` : '';
+        const target = targets.has(square);
+        piece.textContent = occupied ? pieces[occupied.type] : '';
+        piece.classList.toggle('white', occupied?.color === 'w');
+        button.classList.toggle('last', square === last?.from || square === last?.to);
+        button.classList.toggle('selected', square === selected);
+        button.classList.toggle('turn-piece', whiteTurn && occupied?.color === 'w');
+        button.classList.toggle('target', target);
+        button.classList.toggle('capture', target && Boolean(occupied));
+        button.classList.toggle('checked', occupied?.type === 'k' && occupied.color === state.turn && state.check);
+        button.setAttribute('aria-label', [square, name, target ? '可走' : ''].filter(Boolean).join('，'));
+        button.setAttribute('aria-pressed', String(square === selected));
+      });
+      status.textContent = state.result || (whiteTurn ? '輪到你' : '輪到 Codex') + (state.check ? ' · 將軍' : '');
+      status.classList.toggle('waiting', !whiteTurn && !state.result);
+      byId('white').classList.toggle('active', whiteTurn);
+      byId('black').classList.toggle('active', !whiteTurn && !state.result);
+      byId('undo').hidden = !state.canUndo;
+      byId('rematch').hidden = !state.result;
+      hint.textContent = state.result ? '這局已結束。' : whiteTurn ? '點棋子，再點要走的格子。' : '回到聊天說「下好了」，也可以直接接著聊。';
+    }
+
+    function update(next) {
+      online = true;
+      if (next.revision === state?.revision) return;
+      state = next;
+      selected = null;
+      closePromotion();
+      draw();
+      const score = byId('score');
+      score.replaceChildren();
+      for (let index = 0; index < state.moves.length; index += 2) {
+        const row = document.createElement('li');
+        for (const text of [`${index / 2 + 1}.`, state.moves[index].san, state.moves[index + 1]?.san || '']) {
+          const cell = document.createElement('span');
+          cell.textContent = text;
+          row.append(cell);
+        }
+        score.append(row);
+      }
+      byId('score-section').hidden = state.moves.length === 0;
+      score.scrollTop = score.scrollHeight;
+    }
+
+    async function refresh() {
+      if (busy) return;
+      const request = ++lastRequest;
+      try {
+        const response = await fetch('/state', { signal: AbortSignal.timeout(4000) });
+        if (!response.ok) throw new Error();
+        const next = await response.json();
+        if (request === lastRequest && !busy) {
+          if (!online) setError();
+          update(next);
+        }
+      } catch {
+        if (request !== lastRequest || busy) return;
+        online = false;
+        if (!state) status.textContent = '等待連線';
+        setError('與棋盤中斷連線，正在重新連線。');
+      }
+    }
+
+    async function submit(route, data) {
+      if (!state || !online || busy) return;
+      busy = true;
+      lastRequest++;
+      setError();
+      try {
+        const response = await fetch(route, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ revision: state.revision, ...data }),
+          signal: AbortSignal.timeout(4000),
+        });
+        const next = await response.json();
+        if (!response.ok) throw new Error(next.error);
+        update(next);
+      } catch (error) {
+        setError(error.name === 'Error' ? error.message : '棋盤暫時未回應，正在確認局面。');
+      } finally {
+        busy = false;
+        refresh();
+      }
+    }
+
+    function selectSquare(square) {
+      if (!online || busy || !state || state.result || state.turn !== 'w' || promotionMoves.length) return;
+      const choices = state.legal.filter(move => move.from === selected && move.to === square);
+      if (choices.length > 1) return askPromotion(choices);
+      if (choices.length === 1) return submit('/white', choices[0]);
+      selected = selected !== square && state.board.some(piece => piece?.square === square && piece.color === 'w') ? square : null;
+      setError();
+      draw();
+    }
+
+    function askPromotion(choices) {
+      promotionMoves = choices;
+      const options = byId('promotion-options');
+      options.replaceChildren();
+      for (const move of choices) {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = 'action';
+        option.textContent = pieces[move.promotion];
+        option.setAttribute('aria-label', names[move.promotion]);
+        option.addEventListener('click', () => {
+          closePromotion();
+          submit('/white', move);
+        });
+        options.append(option);
+      }
+      byId('promotion').hidden = false;
+      board.inert = true;
+      options.firstElementChild.focus();
+    }
+
+    function closePromotion(restoreFocus = false) {
+      promotionMoves = [];
+      byId('promotion').hidden = true;
+      board.inert = false;
+      if (restoreFocus) squares.find(({ square }) => square === selected)?.button.focus();
+    }
+
+    byId('cancel').addEventListener('click', () => closePromotion(true));
+    byId('promotion').addEventListener('keydown', event => {
+      if (event.key === 'Escape') closePromotion(true);
+    });
+    byId('undo').addEventListener('click', () => submit('/undo'));
+    byId('rematch').addEventListener('click', () => submit('/rematch'));
+    async function poll() {
+      await refresh();
+      window.setTimeout(poll, 1200);
+    }
+    poll();
+  </script>
+</body>
+</html>

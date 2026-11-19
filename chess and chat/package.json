@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "chess.js": "file:chess.js-1.4.0.tgz"
+  }
+}
