@@ -6,6 +6,8 @@ You can take back your latest move before Codex makes its move, close the board 
 
 You can customize the chat style by editing [`chat-style.txt`](.agents/skills/chess-and-chat/references/chat-style.txt). The default has a warm, mature, slightly protective big-sister vibe. Yeah, I know...
 
+<img width="1871" height="989" alt="how it look like" src="https://github.com/user-attachments/assets/bbef12ff-7aa5-4e36-9888-270e7fab85fc" />
+
 ## Installation
 
 You’ll need the **Codex desktop app** and **Node.js with npm**. This project was tested on Windows with Node.js 22.
